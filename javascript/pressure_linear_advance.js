@@ -273,16 +273,16 @@ ${(ANCHOR_OPTION != 'no_anchor' ? `;  - Anchor Line Width: ${ANCHOR_LAYER_LINE_R
 ;  - Printing Direction: ${PRINT_DIR} degree
 ;
 ; Pressure Advance Stepping:
-;  - ${(FIRMWARE == 'klipper' ? 'PA' : 'LA')} Start Value: ${Math.round10(PA_START, PA_round)}
-;  - ${(FIRMWARE == 'klipper' ? 'PA' : 'LA')} End Value: ${PA_END}
-;  - ${(FIRMWARE == 'klipper' ? 'PA' : 'LA')} Increment: ${PA_STEP}
+;  - ${(FIRMWARE == 'klipper' || FIRMWARE == 'rrf3' ? 'PA' : 'LA')} Start Value: ${Math.round10(PA_START, PA_round)}
+;  - ${(FIRMWARE == 'klipper' || FIRMWARE == 'rrf3' ? 'PA' : 'LA')} End Value: ${PA_END}
+;  - ${(FIRMWARE == 'klipper' || FIRMWARE == 'rrf3' ? 'PA' : 'LA')} Increment: ${PA_STEP}
 ;  - Numbering: ${USE_LINENO}
 ${(USE_LINENO ? `;  - No Leading Zeroes: ${LINENO_NO_LEADING_ZERO}\n`: '')}\
 ;  - Show on LCD: ${ECHO}
 ;
 ; Calculated Values:
 ;  - Number of Patterns to Print: ${NUM_PATTERNS}
-;  - ${(FIRMWARE == 'klipper' ? 'PA' : 'LA')} Values: `;
+;  - ${(FIRMWARE == 'klipper' || FIRMWARE == 'rrf3' ? 'PA' : 'LA')} Values: `;
  
 for (let i = 0; i < NUM_PATTERNS; i++){
   pa_script += Math.round10((PA_START + i * PA_STEP),PA_round);
@@ -329,9 +329,13 @@ ${(FIRMWARE == 'klipper' ? `SET_VELOCITY_LIMIT ACCEL=${ACCELERATION}` : `M204 P$
     }
     if (ECHO){pa_script += `M117 PA${Math.round10(PA_START, PA_round)}\n`}
   }
-  else {
+  else if (FIRMWARE == 'marlin-1.1.8' || FIRMWARE == 'marlin-1.1.9'){
     pa_script += `M900 K${Math.round10(PA_START, PA_round)} ${(TOOL_INDEX != 0 ? `T${TOOL_INDEX} ` : '')}; Set linear advance k factor\n`;
     if (ECHO){pa_script += `M117 K${Math.round10(PA_START, PA_round)}\n`}
+  }
+  else if (FIRMWARE == 'rrf3'){
+    pa_script += `M572 S${Math.round10(PA_START, PA_round)} ${(TOOL_INDEX != 0 ? `D${TOOL_INDEX} ` : '')}; Set pressure advance\n`;
+    if (ECHO){pa_script += `M117 S${Math.round10(PA_START, PA_round)}\n`}
   }
 
   // create anchor + line numbering frame if selected
@@ -407,9 +411,13 @@ ${(FIRMWARE == 'klipper' ? `SET_VELOCITY_LIMIT ACCEL=${ACCELERATION}` : `M204 P$
         }
         if (ECHO){pa_script += `M117 PA${Math.round10((PA_START + (j * PA_STEP)), PA_round)}\n`}
       }
-      else {
+      else if (FIRMWARE == 'marlin-1.1.8' || FIRMWARE == 'marlin-1.1.9'){
         pa_script += `M900 K${Math.round10((PA_START + (j * PA_STEP)), PA_round)} ${(TOOL_INDEX != 0 ? `T${TOOL_INDEX} ` : '')}; Set linear advance k factor\n`;
         if (ECHO){pa_script += `M117 K${Math.round10((PA_START + (j * PA_STEP)), PA_round)}\n`}
+      }
+      else if (FIRMWARE == 'rrf3'){
+        pa_script += `M572 S${Math.round10((PA_START + (j * PA_STEP)), PA_round)} ${(TOOL_INDEX != 0 ? `D${TOOL_INDEX} ` : '')}; Set pressure advance\n`;
+        if (ECHO){pa_script += `M117 S${Math.round10((PA_START + (j * PA_STEP)), PA_round)}\n`}
       }
     
       for (let k = 0; k < PERIMETERS ; k++){
@@ -450,9 +458,13 @@ ${(FIRMWARE == 'klipper' ? `SET_VELOCITY_LIMIT ACCEL=${ACCELERATION}` : `M204 P$
     }
     if (ECHO){pa_script += `M117 PA${Math.round10(PA_START, PA_round)}\n`}
   }
-  else {
+  else if (FIRMWARE == 'marlin-1.1.8' || FIRMWARE == 'marlin-1.1.9'){
     pa_script += `M900 K${Math.round10(PA_START, PA_round)} ${(TOOL_INDEX != 0 ? `T${TOOL_INDEX} ` : '')}; Set linear advance k factor back to start value\n`;
     if (ECHO){pa_script += `M117 K${Math.round10(PA_START, PA_round)}\n`}
+  }
+  else if (FIRMWARE == 'rrf3'){
+    pa_script += `M572 S${Math.round10(PA_START, PA_round)} ${(TOOL_INDEX != 0 ? `D${TOOL_INDEX} ` : '')}; Set pressure advance back to start value\n`;
+    if (ECHO){pa_script += `M117 S${Math.round10(PA_START, PA_round)}\n`}
   }
   pa_script += doEfeed('-', basicSettings) +`\
 ;
@@ -997,7 +1009,9 @@ function toggleBedShape() {
 }
 
 function toggleStartEndGcode(){
-  var CANNED_GCODE = `\
+  var CANNED_GCODE = {};
+
+  CANNED_GCODE["klipper"] = `\
 G28                                        ; Home all axes
 G90                                        ; Use absolute positioning
 G1 Z5 F100                                 ; Z raise
@@ -1010,7 +1024,19 @@ G28 Z                                      ; Home Z
 ;BED_MESH_CALIBRATE                        ; Generate bed mesh (uncomment if used)
 M112                                       ; Reading comprehension check! (emergency stop)`
 
-  var STANDALONE_MACRO = `\
+  CANNED_GCODE["rrf3"] = `\
+G28                                        ; Home all axes
+T[TOOL_INDEX]                              ; Select tool
+G90                                        ; Absolute XYZ
+G1 Z5 F100                                 ; Z raise
+M190 S[BED_TEMP]                           ; Set and wait for bed temp
+M568 P[TOOL_INDEX] S[HOTEND_TEMP] A2       ; Set and wait for hotend temp
+;G29                                       ; Auto bed leveling
+M112                                       ; Reading comprehension check! (emergency stop)`
+
+  var STANDALONE_MACRO = {};
+
+  STANDALONE_MACRO["klipper"] = `\
 M190 S[BED_TEMP]                           ; Set and wait for bed temp
 M109 S[HOTEND_TEMP]                        ; Set and wait for hotend temp
 PRINT_START                                ; Start macro
@@ -1020,13 +1046,33 @@ PRINT_START                                ; Start macro
 ;
 M112                                       ; Reading comprehension check! (emergency stop)`
 
-  var STANDALONE_TEMP_PASSING_MACRO = `\
+  STANDALONE_MACRO["rrf3"] = `\
+M190 S[BED_TEMP]                           ; Set and wait for bed temp
+M568 P[TOOL_INDEX] S[HOTEND_TEMP] A2       ; Set and wait for hotend temp
+M98 P"/sys/print_start.g"                  ; Start macro
+;
+; Make sure this macro name matches your own!
+;
+M112                                       ; Reading comprehension check! (emergency stop)`
+
+  var STANDALONE_TEMP_PASSING_MACRO = {};
+  
+  STANDALONE_TEMP_PASSING_MACRO["klipper"] = `\
 PRINT_START HOTEND=[HOTEND_TEMP] BED=[BED_TEMP] CHAMBER=40 ; Start macro w/ temp params
 ;
 ; - Make sure the macro name AND parameter names match YOUR start macro setup!
 ;     (For example, some macros use EXTRUDER=X rather than HOTEND=X, or START_PRINT instead of PRINT_START)!
 ; - Replace any slicer variables with those listed above! It should look like the top example, !!! NOT !!! like this:
 ;     PRINT_START BED=[first_layer_bed_temperature](...)
+;
+M112                                            ; Reading comprehension check! (emergency stop)`
+
+  STANDALONE_TEMP_PASSING_MACRO["rrf3"] = `\
+M98 P"/sys/print_start.g" E[HOTEND_TEMP] B[BED_TEMP]  ; Start macro w/ temp params
+;
+; - Make sure the macro name AND parameter names match YOUR start macro setup!
+; - Replace any slicer variables with those listed above! It should look like the top example, !!! NOT !!! like this:
+;     M98 P"/sys/print_start.g" B=[first_layer_bed_temperature](...)
 ;
 M112                                            ; Reading comprehension check! (emergency stop)`
 
@@ -1042,16 +1088,16 @@ M112                 ; Reading comprehension check! (emergency stop)`
 
   switch (true){
     case $('#START_GCODE_TYPE').val() == "custom" :
-      $('#START_GCODE').val(CANNED_GCODE);
+      $('#START_GCODE').val(CANNED_GCODE[$('#FIRMWARE').val()]);
       break;
     case $('#START_GCODE_TYPE').val() == "custom-marlin" :
       $('#START_GCODE').val(MARLIN_GCODE);
       break;
     case $('#START_GCODE_TYPE').val() == "standalone" :
-      $('#START_GCODE').val(STANDALONE_MACRO);
+      $('#START_GCODE').val(STANDALONE_MACRO[$('#FIRMWARE').val()]);
       break;
     case $('#START_GCODE_TYPE').val() == 'standalone_temp_passing' :
-      $('#START_GCODE').val(STANDALONE_TEMP_PASSING_MACRO);
+      $('#START_GCODE').val(STANDALONE_TEMP_PASSING_MACRO[$('#FIRMWARE').val()]);
       break;
   }
   validate();
@@ -1076,6 +1122,9 @@ It must contain <strong>all necessary preparatory g-codes!</strong><br>
 }
 
 function toggleFirmwareOptions(){
+  var RRF3_END_GCODE = `\
+M0`
+
   var MARLIN_END_GCODE = `\
 M107     ; Turn off fan
 M400     ; Finish moving
@@ -1135,6 +1184,22 @@ Run the test again with a narrower range and finer increment afterwards.<br><br>
       $('#START_GCODE_TYPE').parents().eq(1).hide()
       $('#END_GCODE').val(MARLIN_END_GCODE);
       break;
+      case $('#FIRMWARE').val() == ('rrf3') :
+        $('#TOOL_INDEX').parents().eq(1).show()
+        $('#EXTRUDER_NAME').parents().eq(1).hide()
+        $('#STEPPING_HEADER').html('Pressure Advance Stepping')
+        $('#STEPPING_HEADER_BODY').html(`\
+  <i>Direct Drive: Start with ~0 to ~0.08 @ 0.005 increment<br>
+  Bowden: Start with ~0 to ~1* @ 0.05 increment<br><br>
+  This will get a rough idea of what range to work in.<br>
+  Run the test again with a narrower range and finer increment afterwards.<br><br>
+  *Very long Bowden paths can sometimes need higher than 1.`)
+        $('label[for=PA_START]').html('PA Start Value')
+        $('label[for=PA_END]').html('PA End Value')
+        $('label[for=PA_STEP]').html('PA Increment')
+        $('#START_GCODE_TYPE').parents().eq(1).show()
+        $('#END_GCODE').val(RRF3_END_GCODE);
+        break;
   }
 }
 
@@ -1158,6 +1223,12 @@ function toggleFirmwareValues(){
       $('#PA_END').val(0.08)
       $('#PA_STEP').val(0.005)
       break;
+    case $('#FIRMWARE').val() === 'rrf3' :
+        $('#START_GCODE_TYPE').val('custom');
+        $('#PA_START').val(0)
+        $('#PA_END').val(0.08)
+        $('#PA_STEP').val(0.005)
+        break;
   }
   validate(true);
 }
@@ -1223,7 +1294,7 @@ function displayCalculatedValues(action = 'show'){
 <strong>Print size X: </strong> ${Math.round10(FIT_WIDTH, -1)}mm<br>
 <strong>Print size Y: </strong> ${Math.round10(FIT_HEIGHT, -1)}mm<br>
 <strong>Pattern count: </strong> ${NUM_PATTERNS}<br>
-<strong>${(FIRMWARE === 'klipper') ? 'PA' : 'LA'} values: </strong>`
+<strong>${(FIRMWARE === 'klipper' || FIRMWARE === 'rrf3') ? 'PA' : 'LA'} values: </strong>`
     for (let i = 0; i < NUM_PATTERNS; i++){
       body += `${Math.round10((PA_START + i * PA_STEP),PA_round)}`;
       if (i != NUM_PATTERNS - 1){ // add comma separator if not last item in list
@@ -1493,8 +1564,11 @@ function validate(updateRender = false) {
       message += "- <tt>G28</tt><br>";
     case (!$('#START_GCODE').val().includes('M190 S[BED_TEMP]') && !($('#START_GCODE_TYPE').val() === 'standalone_temp_passing')) :
       message += "- <tt>M190 S[BED_TEMP]</tt><br>";
-    case (!$('#START_GCODE').val().includes('M109 S[HOTEND_TEMP]') && !($('#START_GCODE_TYPE').val() === 'standalone_temp_passing')) :
+    case ($('#FIRMWARE').val() !== 'rrf3' && !$('#START_GCODE').val().includes('M109 S[HOTEND_TEMP]') && !($('#START_GCODE_TYPE').val() === 'standalone_temp_passing')) :
       message += "- <tt>M109 S[HOTEND_TEMP]</tt><br>";
+      break;
+    case ($('#FIRMWARE').val() === 'rrf3' && !$('#START_GCODE').val().includes('M109 S[HOTEND_TEMP]') && !$('#START_GCODE').val().includes('M568 P[TOOL_INDEX] S[HOTEND_TEMP] A2') && !($('#START_GCODE_TYPE').val() === 'standalone_temp_passing')) :
+        message += "- <tt>M109 S[HOTEND_TEMP] or M568 P[TOOL_INDEX] S[HOTEND_TEMP] A2</tt><br>";
   }
   message
 
