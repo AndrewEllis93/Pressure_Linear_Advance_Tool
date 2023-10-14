@@ -111,10 +111,10 @@ const Settings = {
   nozzle_diameter: 0.4,
   num_layers: 4,
   origin_center: false,
-  pa_end: 0.08,
+  pa_end: 0.3,
   pa_smooth: false,
   pa_start: 0,
-  pa_step: 0.005,
+  pa_step: 0.02,
   pattern_options_enable: false,
   pattern_spacing: 2,
   print_dir: 0,
@@ -1585,7 +1585,7 @@ function toggleFirmwareOptions(){
       }
       $("#STEPPING_HEADER").html("Pressure Advance Stepping");
       $("#STEPPING_HEADER_BODY").html(`\
-<i>Direct Drive: Start with ~0 to ~0.08 @ 0.005 increment<br>
+<i>Direct Drive: Start with ~0 to ~0.3 @ 0.02 increment<br>
 Bowden: Start with ~0 to ~1* @ 0.05 increment<br>
 <sup>*Long bowden paths can sometimes need higher than 1</sup><br></i>
 Once you find a general range, run again with narrower range / finer increment.<br>`);
@@ -1602,7 +1602,7 @@ Once you find a general range, run again with narrower range / finer increment.<
       $("#EXTRUDER_NAME").parent().hide();
       $("#STEPPING_HEADER").html("Linear Advance Stepping");
       $("#STEPPING_HEADER_BODY").html(`\
-<i>Direct Drive: Start with ~0 to ~0.08 @ 0.005 increment<br>
+<i>Direct Drive: Start with ~0 to ~0.3 @ 0.02 increment<br>
 Bowden: Start with ~0 to ~1* @ 0.05 increment<br>
 <sup>*Long bowden paths can sometimes need higher than 1</sup><br></i>
 Once you find a general range, run again with narrower range / finer increment.<br>`);
