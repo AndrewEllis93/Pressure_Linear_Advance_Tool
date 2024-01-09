@@ -325,7 +325,7 @@ const Settings = {
 
         // PS / SS native variables
         .replace(/{first_layer_temperature.*?}/g, this.hotend_temp)
-        .replace(/\[first_layer_temperature.*?\]/g, this.hotend_temp)
+        .replace(/\[first_layer_temperature.*?\]+/g, this.hotend_temp)
         .replace(/{first_layer_bed_temperature.*?}/g, this.bed_temp)
         .replace(/\[first_layer_bed_temperature.*?\]/g, this.bed_temp)
         .replace(/{chamber_temperature.*?}/g, 0)
