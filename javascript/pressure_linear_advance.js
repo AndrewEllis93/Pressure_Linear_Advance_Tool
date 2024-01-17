@@ -94,6 +94,7 @@ const Settings = {
   end_gcode: "",
   expert_mode: false,
   ext_mult: 0.98,
+  exclude_objects_enable: false,
   extruder_name: "",
   extruder_name_enable: false,
   fan_speed: 100,
@@ -806,6 +807,11 @@ for (let i = 0; i < config.numPatterns(); i++){
   }
 }
 
+// create exclude object definitions
+if (config.expert_mode && config.exclude_objects_enable){
+  state.pa_script += excludeObjectDefinition(config.patternStartX(), config.patternStartY(), config.printSizeX(), config.printSizeX(), basicSettings);
+}
+
 state.pa_script += `\
 ;
 ; Prepare printing
@@ -822,6 +828,10 @@ G92 E0 ; Reset extruder distance
 ;
 M106 S${Math.round(config.fan_speed_firstlayer * 2.55)} ${(config.firmware.includes('marlin') && config.tool_index != 0 ? ` P${config.tool_index} ` : '')}; Set fan speed
 `;
+
+if (config.expert_mode && config.exclude_objects_enable){
+  state.pa_script += `EXCLUDE_OBJECT_START NAME=pa_pattern;\n`;
+}
 
 if (config.acceleration_enable){
   if (config.firmware === 'klipper') {
@@ -968,6 +978,10 @@ if (config.acceleration_enable){
         }
       }
     }
+  }
+
+  if (config.expert_mode && config.exclude_objects_enable){
+    state.pa_script += `EXCLUDE_OBJECT_END NAME=pa_pattern;\n`;
   }
 
   if (config.firmware == 'klipper'){
@@ -1300,6 +1314,17 @@ function retract(dir, basicSettings, optional) {
 }
 
 // draw perimeter, move inwards, repeat
+function excludeObjectDefinition(min_x, min_y, size_x, size_y, basicSettings){
+  let gcode = '',
+      max_x = min_x + size_x,
+      max_y = min_y + size_y;
+  
+  gcode += `EXCLUDE_OBJECT_DEFINE NAME=pa_pattern CENTER=${basicSettings['centerX']},${basicSettings['centerY']}  POLYGON=[[${min_x},${min_y}],[${min_x},${max_y}],[${max_x},${max_y}],[${max_x},${min_y}],[${min_x},${min_y}]];\n`
+
+  return gcode;
+}
+
+// draw perimeter, move inwards, repeat
 function drawBox(min_x, min_y, size_x, size_y, basicSettings, optional){
   let gcode = '',
       x = min_x,
@@ -1547,6 +1572,7 @@ function toggleExtruderName() {
 function toggleExpertMode() {
   if ($("#EXPERT_MODE").is(":checked")) {
     $("#ORIGIN_CENTER").parents().eq(1).show();
+    $("#EXCLUDE_OBJECTS_ENABLE").parents().eq(1).show();
     $("label[for=FW_RETRACT]").parent().css({ opacity: 1 });
     $("#FW_RETRACT").parent().css({ opacity: 1 });
     toggleFwRetract();
@@ -1561,6 +1587,7 @@ function toggleExpertMode() {
     toggleFirmwareOptions();
   } else {
     $("#ORIGIN_CENTER").parents().eq(1).hide();
+    $("#EXCLUDE_OBJECTS_ENABLE").parents().eq(1).hide();
     $("label[for=FW_RETRACT]").parent().css({ opacity: 0 });
     $("#FW_RETRACT").parent().css({ opacity: 0 });
     toggleFwRetract();
