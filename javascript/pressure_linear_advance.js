@@ -315,6 +315,15 @@ const Settings = {
       }
     }
 
+    // Prepend exclude_object metadata if firmware is klipper
+    if(this.firmware == 'klipper') {
+      const xmin = Math.floor(this.patternStartX());
+      const ymin = Math.floor(this.patternStartY());
+      const xmax = Math.ceil(this.patternStartX() + this.printSizeX());
+      const ymax = Math.ceil(this.patternStartY() + this.printSizeY());
+      gcode = `EXCLUDE_OBJECT_DEFINE NAME=pressure_advance_calibration CENTER=${(xmin+xmax)/2},${(ymin+ymax)/2} POLYGON=[[${xmin},${ymin}],[${xmin},${ymax}],[${xmax},${ymax}]]\n${gcode}`;
+    }
+
     // Replace user variables/placeholders with real values
     return (
       gcode
